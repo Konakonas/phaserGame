@@ -1,5 +1,71 @@
 let game;
 let win = false;
+const templateAttack = [
+        {s: '022220', w: 9000},
+        {s: '22220', w: 9000},
+        {s: '22202', w: 9000},
+        {s: '22022', w: 9000},
+        {s: '20222', w: 9000},
+        {s: '02222', w: 9000},
+        {s: '020222', w: 3000},
+        {s: '022022', w: 3000},
+        {s: '022202', w: 3000},
+        {s: '222020', w: 3000},
+        {s: '220220', w: 3000},
+        {s: '202220', w: 3000},
+        {s: '02220', w: 2000},
+        {s: '00222', w: 2000},
+        {s: '22200', w: 2000},
+        {s: '22020', w: 500},
+        {s: '02022', w: 500},
+        {s: '0220', w: 20},
+        {s: '00200', w: 5},
+        {s: '00020', w: 3},
+        {s: '02000', w: 3},
+        {s: '00002', w: 2},
+        {s: '20000', w: 2},
+        {s: '02', w: 1},
+        {s: '20', w: 1},
+    ];
+const neighbors = [
+    {x: 1, y: 0},
+    {x: 1, y: 1},
+    {x: 1, y: -1},
+    {x: 0, y: 1},
+    {x: 0, y: -1},
+    {x: -1, y: 0},
+    {x: -1, y: 1},
+    {x: -1, y: -1},
+];
+const templateDefence = [
+        {s: '011110', w: 9000},
+        {s: '01111', w: 9000},
+        {s: '11110', w: 9000},
+        {s: '010111', w: 7000},
+        {s: '011011', w: 7000},
+        {s: '011101', w: 7000},
+        {s: '111010', w: 7000},
+        {s: '110110', w: 7000},
+        {s: '101110', w: 7000},
+        {s: '01110', w: 2000},
+        {s: '00111', w: 2000},
+        {s: '11100', w: 2000},
+        {s: '01101', w: 500},
+        {s: '01011', w: 500},
+        {s: '11010', w: 500},
+        {s: '10110', w: 500},
+        {s: '01010', w: 90},
+        {s: '01100', w: 50},
+        {s: '00100', w: 5},
+        {s: '0110', w: 20},
+        {s: '010', w: 1},
+    ];
+const direction = [
+      [0, 1],
+      [1, 0],
+      [1, 1],
+      [1, -1],
+    ];
 
 window.onload = () => {
   const config = {
@@ -65,7 +131,7 @@ class PlayGameScene extends Phaser.Scene {
           x,
           y,
         });
-        this.dotsArray[row][col] = null;
+        this.dotsArray[row][col] = 0;
       }
     }
     this.deskLimit = 5;
@@ -95,7 +161,7 @@ class PlayGameScene extends Phaser.Scene {
           x,
           y,
         });
-        if (col > 4 || row > 4) this.dotsArray[row][col] = null;
+        if (col > 4 || row > 4) this.dotsArray[row][col] = 0;
       }
     }
     this.deskLimit = 8;
@@ -132,19 +198,103 @@ class PlayGameScene extends Phaser.Scene {
   }
 
   compTurn(limit, array) {
-    let dotsFound = false;
-    let ranX = 0;
-    let ranY = 0;
-    while (!dotsFound) {
-      ranX = this.getRandomInt(limit);
-      ranY = this.getRandomInt(limit);
-      if (array[ranY][ranX] !== 1 && array[ranY][ranX] !== 2) {
-        dotsFound = true;
-        this.dotsArray[ranY][ranX] = 2;
-      }
+    let attack = this.posibleWays(limit);
+    if (!attack) {
+        let dotsFound = false;
+        let ranX = 0;
+        let ranY = 0;
+        while (!dotsFound) {
+          ranX = this.getRandomInt(limit);
+          ranY = this.getRandomInt(limit);
+          if (array[ranY][ranX] !== 1 && array[ranY][ranX] !== 2) {
+            dotsFound = true;
+            this.dotsArray[ranY][ranX] = 2;
+          }
+        }
+        this.checkWin(ranX, ranY, 2);
+        return { x: ranX, y: ranY };
     }
-    this.checkWin(ranX, ranY, 2);
-    return { x: ranX, y: ranY };
+    this.dotsArray[attack.x][attack.y] = 2;
+    console.log(this.dotsArray);
+    this.checkWin(attack.x, attack.y, 2);
+    return { x: attack.y, y: attack.x };
+  }
+    
+  posibleWays(limit) {
+    let possibleWaysArray = [];  
+    for (let i = 0; i < limit; i++) {
+        for (let j = 0; j < limit; j++) {
+            let power = 0;
+            if (this.dotsArray[i][j] === 0) {
+                if (this.neighborCheck(i,j, this.dotsArray, limit)) {
+                   power += this.getCurrentString(i,j,true);
+                } 
+                power += this.getCurrentString(i,j,false);
+                possibleWaysArray.push({ x: i, y: j, power: this.getCurrentString(i,j)});
+            }
+            else console.log(this.dotsArray[i][j]);
+        }
+    }
+    return  possibleWaysArray.sort((a, b) => a.power > b.power ? -1 : 1)[0];
+  }
+  
+  getCurrentString(x,y,isAttack) {
+    const deskLimit = this.deskLimit;
+    let strength = 0; 
+    let count = 0;
+    for (let dir = 0; dir < direction.length; dir++) {
+        let string = '';
+        let opString = '';
+        for (let i = 0; i < 7; i++) {
+        if (
+          x + direction[dir][0] * i > deskLimit - 1 ||
+          y + direction[dir][1] * i > deskLimit - 1 ||
+          y + direction[dir][1] * i < 0
+        ) break;
+        string += String(this.dotsArray[x + direction[dir][0] * i][y + direction[dir][1] * i]);
+      }
+      for (let i = 1; i < 7; i++) {
+        if (
+          x - direction[dir][0] * i < 0 ||
+          y - direction[dir][1] * i < 0 ||
+          y - direction[dir][1] * i > deskLimit - 1
+        ) break;
+        opString += String(this.dotsArray[x - direction[dir][0] * i][ y - direction[dir][1] * i ]);      
+      }
+        let result = opString.split("").reverse().join("") + string;
+        if (result.length > 4) {
+            strength += this.checkStrength(result, isAttack);  
+        }
+        console.log(strength);
+    }
+    
+    return strength;
+    
+  }
+      
+  checkStrength(result, isAttack) {
+    let power = 0;
+    if (isAttack) {
+        for (let i = 0; i < templateAttack.length; i++) {
+            if (result.includes(templateAttack[i].s)) power += templateAttack[i].w;
+        }
+    }
+    else {
+        for (let i = 0; i < templateDefence.length; i++) {
+            if (result.includes(templateDefence[i].s)) power += templateDefence[i].w;
+        }
+    }
+    return power;
+  }
+      
+  neighborCheck (x,y, dotsArray, limit) {    
+      let founded = false;
+      for (let i = 0; i < neighbors.length; i++) {
+          if (x+neighbors[i].x > -1 && y+neighbors[i].y > -1 && x+neighbors[i].x < limit && y+neighbors[i].y < limit) {
+            if (dotsArray[x+neighbors[i].x][y+neighbors[i].y] === 2) founded = true;
+          }
+      }  
+      return founded;
   }
 
   getRandomInt(max) {
@@ -154,12 +304,6 @@ class PlayGameScene extends Phaser.Scene {
 
   checkWin(x, y, turn) {
     const deskLimit = this.deskLimit;
-    const direction = [
-      [0, 1],
-      [1, 0],
-      [1, 1],
-      [1, -1],
-    ];
     for (let dir = 0; dir < direction.length; dir++) {
       let count = 0;
       for (let i = 1; i < deskLimit; i++) {
